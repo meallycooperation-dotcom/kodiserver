@@ -125,8 +125,18 @@ export const handlePaystackWebhook = async (req, res) => {
         return res.sendStatus(200)
       }
 
-      const selectedPlan = SUBSCRIPTION_PLANS[plan.toLowerCase()]
-      const { name, max_apartments, max_airbnbs, max_rentals } = selectedPlan
+      const selectedPlan = plan ? SUBSCRIPTION_PLANS[plan.toLowerCase()] : null
+      if (!selectedPlan) {
+        console.error('Missing or invalid plan in metadata')
+        return res.sendStatus(200)
+      }
+      const { name, price, max_apartments, max_airbnbs, max_rentals } = selectedPlan
+
+      // 💡 Price validation to prevent mismatches
+      if (amount < price) {
+        console.error('Payment amount mismatch')
+        return res.sendStatus(200)
+      }
 
       // ✅ Update the associated transaction to reflect success
       await supabase

@@ -13,7 +13,22 @@ export const initializePayment = async (req, res) => {
     if (!email || !amount || !user_id || !plan)
       return res.status(400).json({ error: 'Missing required fields' })
 
-    // Create a pending transaction record to track this payment attempt (after validation)
+    // Prevent duplicate pending transactions for the same user
+    const { data: existingPending } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', user_id)
+      .eq('status', 'pending')
+      .maybeSingle()
+
+    if (existingPending) {
+      return res.json({
+        message: 'Pending payment already exists',
+        reference: existingPending.payment_reference
+      })
+    }
+
+    // Create a pending transaction record to track this payment attempt
     await supabase.from('transactions').insert([
       {
         user_id,

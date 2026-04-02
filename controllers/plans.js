@@ -9,7 +9,7 @@ export const SUBSCRIPTION_PLANS = {
   },
   standard: {
     name: "Standard",
-    price: 2999,
+    price: 10,
     max_apartments: 6,
     max_airbnbs: 6,
     max_rentals: 6
