@@ -169,26 +169,46 @@ export const handlePaystackWebhook = async (req, res) => {
       if (activeSub) endsAt = new Date(activeSub.ends_at)
       endsAt.setMonth(endsAt.getMonth() + 1)
 
-      // 💾 Save subscription
-      const { error } = await supabase
+      // 💾 Save subscription (upsert behavior by plan for the user)
+      // Check for an existing subscription for this user and plan
+      const { data: existingSub } = await supabase
         .from('subscriptions')
-        .insert([
-          {
-            user_id,
-            plan_name: name,
-            max_apartments,
-            max_airbnbs,
-            max_rentals,
-            payment_reference: reference,
-            payment_method: 'paystack',
-            amount_paid: amount,
-            status: 'active',
-            ends_at: endsAt.toISOString(),
-            last_payment_at: new Date().toISOString()
-          }
-        ])
+        .select('*')
+        .eq('user_id', user_id)
+        .eq('plan_name', name)
+        .single()
 
-      if (error) throw error
+      if (existingSub) {
+        // Update existing subscription to active and extend ends_at
+        await supabase
+          .from('subscriptions')
+          .update({
+            status: 'active',
+            last_payment_at: new Date().toISOString(),
+            ends_at: endsAt.toISOString()
+          })
+          .eq('id', existingSub.id)
+      } else {
+        // Create a new subscription for this user and plan
+        const { error } = await supabase
+          .from('subscriptions')
+          .insert([
+            {
+              user_id,
+              plan_name: name,
+              max_apartments,
+              max_airbnbs,
+              max_rentals,
+              amount_paid: amount,
+              payment_reference: reference,
+              payment_method: 'paystack',
+              status: 'active',
+              ends_at: endsAt.toISOString(),
+              last_payment_at: new Date().toISOString()
+            }
+          ])
+        if (error) throw error
+      }
     }
 
     res.sendStatus(200)
