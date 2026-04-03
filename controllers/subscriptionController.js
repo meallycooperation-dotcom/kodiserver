@@ -170,45 +170,34 @@ export const handlePaystackWebhook = async (req, res) => {
       endsAt.setMonth(endsAt.getMonth() + 1)
 
       // 💾 Save subscription (upsert behavior by plan for the user)
-      // Check for an existing subscription for this user and plan
-      const { data: existingSub } = await supabase
+      const { data: subscriptionUpsert, error: upsertError } = await supabase
         .from('subscriptions')
-        .select('*')
-        .eq('user_id', user_id)
-        .eq('plan_name', name)
-        .single()
-
-      if (existingSub) {
-        // Update existing subscription to active and extend ends_at
-        await supabase
-          .from('subscriptions')
-          .update({
+        .upsert(
+          {
+            user_id,
+            plan_name: name,
+            max_apartments,
+            max_airbnbs,
+            max_rentals,
+            amount_paid: amount,
+            payment_reference: reference,
+            payment_method: 'paystack',
             status: 'active',
+            ends_at: endsAt.toISOString(),
             last_payment_at: new Date().toISOString(),
-            ends_at: endsAt.toISOString()
-          })
-          .eq('id', existingSub.id)
-      } else {
-        // Create a new subscription for this user and plan
-        const { error } = await supabase
-          .from('subscriptions')
-          .insert([
-            {
-              user_id,
-              plan_name: name,
-              max_apartments,
-              max_airbnbs,
-              max_rentals,
-              amount_paid: amount,
-              payment_reference: reference,
-              payment_method: 'paystack',
-              status: 'active',
-              ends_at: endsAt.toISOString(),
-              last_payment_at: new Date().toISOString()
-            }
-          ])
-        if (error) throw error
+            updated_at: new Date().toISOString()
+          },
+          {
+            onConflict: ['user_id', 'plan_name']
+          }
+        )
+
+      if (upsertError) {
+        console.error('Subscription upsert failed', upsertError)
+        throw upsertError
       }
+
+      console.log('Subscription saved:', subscriptionUpsert)
     }
 
     res.sendStatus(200)
